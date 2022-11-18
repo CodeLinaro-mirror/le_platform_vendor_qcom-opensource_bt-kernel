@@ -30,7 +30,12 @@
 #include "btfm_slim.h"
 #endif
 #include <linux/fs.h>
+
+#define RMV_CNSS_DEPENDENCY	1
+
+#ifndef RMV_CNSS_DEPENDENCY
 #include "cnss_utils.h"
+#endif
 
 #define PWR_SRC_NOT_AVAILABLE -2
 #define DEFAULT_INVALID_VALUE -1
@@ -115,7 +120,7 @@ static struct bt_power_vreg_data bt_vregs_info_qca61x4_937x[] = {
 		{BT_VDD_CORE_LDO, BT_VDD_CORE_LDO_CURRENT}},
 };
 
-// Regulator structure for QCA6390,QCA6490 and WCN6750 BT SoC series
+// Regulator structure for QCA6390,QCA6490,WCN6750 and WCN7850 BT SoC series
 static struct bt_power_vreg_data bt_vregs_info_qca6xx0[] = {
 	{NULL, "qcom,bt-vdd-io",      1800000, 1800000, 0, false, true,
 		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
@@ -212,6 +217,12 @@ static struct bt_power bt_vreg_info_wcn6750 = {
 	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
 };
 
+static struct bt_power bt_vreg_info_wcn7850 = {
+	.compatible = "qcom,wcn7850",
+	.vregs = bt_vregs_info_qca6xx0,
+	.num_vregs = ARRAY_SIZE(bt_vregs_info_qca6xx0),
+};
+
 static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,qca6174", .data = &bt_vreg_info_qca6174},
 	{	.compatible = "qcom,wcn3990", .data = &bt_vreg_info_wcn399x},
@@ -220,6 +231,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,kiwi",    .data = &bt_vreg_info_kiwi},
 	{	.compatible = "qcom,wcn6750-bt", .data = &bt_vreg_info_wcn6750},
 	{	.compatible = "qcom,bt-qca-converged", .data = &bt_vreg_info_converged},
+	{	.compatible = "qcom,wcn7850", .data = &bt_vreg_info_wcn7850},
 	{},
 };
 
@@ -976,12 +988,15 @@ static void bt_power_vreg_put(void)
 static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 {
 	int rc;
+#ifndef RMV_CNSS_DEPENDENCY
 	struct device_node *child;
+#endif
 	pr_debug("%s\n", __func__);
 
 	if (!bt_power_pdata)
 		return -ENOMEM;
 
+#ifndef RMV_CNSS_DEPENDENCY
 	if (bt_power_pdata->is_converged_dt) {
 		for_each_available_child_of_node(pdev->dev.of_node, child) {
 			if (bt_power_pdata->bt_device_type == CNSS_HSP_DEVICE_TYPE ) {
@@ -997,6 +1012,7 @@ static int bt_power_populate_dt_pinfo(struct platform_device *pdev)
 			break;
 		}
 	}
+#endif
 	if (pdev->dev.of_node) {
 		rc = bt_power_vreg_get(pdev);
 		if (rc)
@@ -1120,6 +1136,7 @@ static int bt_power_probe(struct platform_device *pdev)
 		}
 		gpio_value = gpio_get_value(bt_power_pdata->wlan_sw_ctrl_gpio);
 		pr_info("%s:WLAN_SW_CNTRL_GPIO value= %d\n", __func__, gpio_value);
+#ifndef RMV_CNSS_DEPENDENCY
 		if(gpio_value) {
 			bt_power_pdata->bt_device_type =
 				cnss_utils_update_device_type(CNSS_HSP_DEVICE_TYPE);
@@ -1127,6 +1144,7 @@ static int bt_power_probe(struct platform_device *pdev)
 			bt_power_pdata->bt_device_type =
 				cnss_utils_update_device_type(CNSS_HMT_DEVICE_TYPE);
 		}
+#endif
 	}
 
 	if (pdev->dev.of_node) {
