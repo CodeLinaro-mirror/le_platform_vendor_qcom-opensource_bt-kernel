@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -805,6 +805,7 @@ static void btpower_rfkill_remove(struct platform_device *pdev)
 	rfkill = platform_get_drvdata(pdev);
 	if (rfkill)
 		rfkill_unregister(rfkill);
+	device_remove_file(&pdev->dev, &dev_attr_extldo);
 	rfkill_destroy(rfkill);
 	platform_set_drvdata(pdev, NULL);
 }
@@ -1602,6 +1603,11 @@ static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata)
 
 static void __exit btpower_exit(void)
 {
+	device_destroy(bt_class, MKDEV(bt_major, 0));
+	if (!IS_ERR(bt_class))
+		class_destroy(bt_class);
+	if (bt_major >= 0)
+		unregister_chrdev(bt_major, "bt");
 	platform_driver_unregister(&bt_power_driver);
 }
 
