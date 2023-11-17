@@ -19,7 +19,9 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
+#ifdef CONFIG_MSM_BT_POWER
 #include "btpower.h"
+#endif
 #include "btfm_slim.h"
 #include "btfm_slim_slave.h"
 #define DELAY_FOR_PORT_OPEN_MS (200)
@@ -89,6 +91,7 @@ int btfm_slim_read(struct btfmslim *btfmslim, uint32_t reg, uint8_t pgd)
 	return ret;
 }
 
+#ifdef CONFIG_MSM_BT_POWER
 static bool btfm_slim_is_sb_reset_needed(int chip_ver)
 {
 	switch (chip_ver) {
@@ -101,15 +104,16 @@ static bool btfm_slim_is_sb_reset_needed(int chip_ver)
 		return false;
 	}
 }
-
+#endif
 int btfm_slim_enable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 	uint8_t rxport, uint32_t rates, uint8_t nchan)
 {
 	int ret = -1;
 	int i = 0;
 	struct btfmslim_ch *chan = ch;
+#ifdef CONFIG_MSM_BT_POWER
 	int chipset_ver;
-
+#endif
 	if (!btfmslim || !ch)
 		return -EINVAL;
 
@@ -143,18 +147,42 @@ int btfm_slim_enable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		chan->dai.sconfig.port_mask |= BIT(ch->port);
 	}
 
+#ifdef CONFIG_MSM_BT_POWER
 	/* Activate the channel immediately */
 	BTFMSLIM_INFO("port: %d, ch: %d", chan->port, chan->ch);
 	chipset_ver = btpower_get_chipset_version();
 	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
+#endif
 
 	/* Delay port opening for few chipsets if:
 		1. for 8k, feedback channel
 		2. 44.1k, 88.2k rxports
 	*/
 	if (((rates == 8000 && btfm_feedback_ch_setting && rxport == 0) ||
-		(rxport == 1 && (rates == 44100 || rates == 88200))) &&
-		btfm_slim_is_sb_reset_needed(chipset_ver)) {
+		(rxport == 1 && (rates == 44100 || rates == 88200)))
+#ifdef CONFIG_MSM_BT_POWER
+		&&	btfm_slim_is_sb_reset_needed(chipset_ver)
+#endif
+		) {
+		BTFMSLIM_INFO("btfm_is_port_opening_delayed %d",
+					btfm_is_port_opening_delayed);
+		if (!btfm_is_port_opening_delayed) {
+			BTFMSLIM_INFO("SB reset needed, sleeping");
+			btfm_is_port_opening_delayed = true;
+			msleep(DELAY_FOR_PORT_OPEN_MS);
+		}
+	}
+
+	/* Delay port opening for few chipsets if:
+		1. for 8k, feedback channel
+		2. 44.1k, 88.2k rxports
+	*/
+	if (((rates == 8000 && btfm_feedback_ch_setting && rxport == 0) ||
+		(rxport == 1 && (rates == 44100 || rates == 88200)))
+#ifdef CONFIG_MSM_BT_POWER
+		 &&	btfm_slim_is_sb_reset_needed(chipset_ver)
+#endif
+		 ) {
 
 		BTFMSLIM_INFO("btfm_is_port_opening_delayed %d",
 					btfm_is_port_opening_delayed);
@@ -218,8 +246,7 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		btfmslim->sample_rate == 88200)) {
 		BTFMSLIM_INFO("disconnecting the ports, removing the channel");
 		/* disconnect the ports of the stream */
-		ret = slim_stream_unprepare_disconnect_port(ch->dai.sruntime,
-				true, false);
+		ret = slim_stream_unprepare(ch->dai.sruntime);
 		if (ret != 0)
 			BTFMSLIM_ERR("slim_stream_unprepare failed %d", ret);
 	}
@@ -229,15 +256,14 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 		BTFMSLIM_ERR("slim_stream_disable failed returned val = %d", ret);
 		if ((btfmslim->sample_rate != 44100) && (btfmslim->sample_rate != 88200)) {
 			/* disconnect the ports of the stream */
-			ret = slim_stream_unprepare_disconnect_port(ch->dai.sruntime,
-					true, false);
+			ret = slim_stream_unprepare(ch->dai.sruntime);
 			if (ret != 0)
 				BTFMSLIM_ERR("slim_stream_unprepare failed %d", ret);
 		}
 	}
 
 	/* free the ports allocated to the stream */
-	ret = slim_stream_unprepare_disconnect_port(ch->dai.sruntime, false, true);
+	ret = slim_stream_unprepare(ch->dai.sruntime);
 	if (ret != 0)
 		BTFMSLIM_ERR("slim_stream_unprepare failed returned val = %d", ret);
 
@@ -261,10 +287,11 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 
 	ch->dai.sruntime = NULL;
 
+#ifdef CONFIG_MSM_BT_POWER
 	BTFMSLIM_INFO("btfm_num_ports_open: %d", btfm_num_ports_open);
 
 	chipset_ver = btpower_get_chipset_version();
-
+#endif
 	if (btfm_num_ports_open == 0 && (chipset_ver == QCA_HSP_SOC_ID_0200 ||
 		chipset_ver == QCA_HSP_SOC_ID_0210 ||
 		chipset_ver == QCA_HSP_SOC_ID_1201 ||
@@ -282,16 +309,16 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 static int btfm_slim_alloc_port(struct btfmslim *btfmslim)
 {
 	int ret = -EINVAL, i;
-	int  chipset_ver;
+	int  chipset_ver = 0;
 	struct btfmslim_ch *rx_chs;
 	struct btfmslim_ch *tx_chs;
 
 	if (!btfmslim)
 		return ret;
-
+#ifdef CONFIG_MSM_BT_POWER
 	chipset_ver = btpower_get_chipset_version();
 	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
-
+#endif
 	rx_chs = btfmslim->rx_chs;
 	tx_chs = btfmslim->tx_chs;
 	if ((chipset_ver >=  QCA_CHEROKEE_SOC_ID_0310) &&
@@ -336,7 +363,7 @@ static int btfm_slim_get_logical_addr(struct slim_device *slim)
 int btfm_slim_hw_init(struct btfmslim *btfmslim)
 {
 	int ret = -1;
-	int chipset_ver;
+	int chipset_ver = 0;
 	struct slim_device *slim;
 	struct slim_device *slim_ifd;
 
@@ -358,9 +385,10 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim->e_addr.manf_id, slim->e_addr.prod_code,
 		slim->e_addr.dev_index, slim->e_addr.instance);
 
-
+#ifdef CONFIG_MSM_BT_POWER
 	chipset_ver = btpower_get_chipset_version();
 	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
+#endif
 
 	if (chipset_ver == QCA_HSP_SOC_ID_0100 ||
 		chipset_ver == QCA_HSP_SOC_ID_0110 ||
@@ -596,7 +624,9 @@ static int btfm_slim_probe(struct slim_device *slim)
 
 	/* Driver specific data allocation */
 	btfm_slim->dev = &slim->dev;
+#ifdef CONFIG_MSM_BT_POWER
 	ret = btpower_register_slimdev(&slim->dev);
+#endif
 	if (ret < 0) {
 		btfm_slim_unregister_codec(&slim->dev);
 		ret = -EPROBE_DEFER;
@@ -611,7 +641,7 @@ static int btfm_slim_probe(struct slim_device *slim)
 		goto register_err;
 	}
 
-	btfm_slim_class = class_create(THIS_MODULE, "btfmslim-dev");
+	btfm_slim_class = class_create("btfmslim-dev");
 	if (IS_ERR(btfm_slim_class)) {
 		BTFMSLIM_ERR("%s: coudn't create class\n", __func__);
 		ret = -1;

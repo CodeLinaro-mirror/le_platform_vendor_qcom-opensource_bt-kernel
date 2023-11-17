@@ -10,7 +10,7 @@
 #include <linux/cdev.h>
 #include <linux/types.h>
 #include <linux/mailbox_client.h>
-#include <linux/mailbox/qmp.h>
+//#include <linux/mailbox/qmp.h>
 /*
  * voltage regulator information required for configuring the
  * bluetooth chipset

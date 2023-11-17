@@ -1429,7 +1429,7 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
-	bt_class = class_create(THIS_MODULE, "bt-dev");
+	bt_class = class_create("bt-dev");
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
@@ -1470,18 +1470,17 @@ driver_err:
  */
  int bt_aop_send_msg(struct btpower_platform_data *plat_priv, char *mbox_msg)
  {
-	struct qmp_pkt pkt;
+	//struct qmp_pkt pkt;
 	int ret = 0;
-	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
-	pkt.data = mbox_msg;
-	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
+//	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
+//	pkt.data = mbox_msg;
+//	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
 	if (ret < 0)
 		pr_err("Failed to send AOP mbox msg: %s\n", mbox_msg);
 	else
 		ret =0;
 	return ret;
-
- }
+}
 int bt_aop_pdc_reconfig(struct btpower_platform_data *pdata)
 {
 
@@ -1538,7 +1537,7 @@ static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
 				   enum btpower_vreg_param param,
 				   enum btpower_tcs_seq seq, int val)
 {
-	struct qmp_pkt pkt;
+	//struct qmp_pkt pkt;
 	char mbox_msg[BTPOWER_MBOX_MSG_MAX_LEN];
 	static const char * const vreg_param_str[] = {"v", "m", "e"};
 	static const char *const tcs_seq_str[] = {"upval", "dwnval", "enable"};
@@ -1552,10 +1551,10 @@ static int btpower_aop_set_vreg_param(struct btpower_platform_data *pdata,
 		 vreg_param_str[param], tcs_seq_str[seq], val);
 
 	pr_info("%s: sending AOP Mbox msg: %s\n", __func__, mbox_msg);
-	pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
-	pkt.data = mbox_msg;
+	//pkt.size = BTPOWER_MBOX_MSG_MAX_LEN;
+	//pkt.data = mbox_msg;
 
-	ret = mbox_send_message(pdata->mbox_chan, &pkt);
+	//ret = mbox_send_message(pdata->mbox_chan, &pkt);
 	if (ret < 0)
 		pr_err("%s:Failed to send AOP mbox msg(%s), err(%d)\n",
 					__func__, mbox_msg, ret);

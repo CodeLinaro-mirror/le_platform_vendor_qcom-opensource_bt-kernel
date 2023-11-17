@@ -200,3 +200,5 @@ enable_disable_rxport:
 error:
 	return ret;
 }
+
+MODULE_LICENSE("GPL v2");
