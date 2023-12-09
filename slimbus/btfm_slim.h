@@ -70,6 +70,7 @@ struct btfmslim {
 	uint32_t bps;
 	uint16_t direction;
 	int dai_id;
+	int soc_id;
 	struct btfmslim_ch *rx_chs;
 	struct btfmslim_ch *tx_chs;
 	int (*vendor_init)(struct btfmslim *btfmslim);
