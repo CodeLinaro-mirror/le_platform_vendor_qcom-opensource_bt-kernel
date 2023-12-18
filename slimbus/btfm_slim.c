@@ -36,6 +36,23 @@ struct btfmslim *btfm_slim_drv_data;
 
 static int btfm_num_ports_open;
 
+int btfm_slim_socid(char *soc_name)
+{
+    BTFMSLIM_ERR("btfm_slim_socid-btfm_socname:%s",soc_name);
+    if (strstr(soc_name, "qca6490")) {
+      return QCA_QCA6490;
+    } else if (strstr(soc_name, "qca6390")) {
+	  return QCA_QCA6390;
+    } else if (strstr(soc_name, "kiwi") ||
+               strstr(soc_name, "wcn7850")) {
+      return QCA_WCN7850;
+    } else if (strstr(soc_name, "wcn3990")) {
+      return QCA_WCN3990;
+    } else if (strstr(soc_name, "wcn6750")) {
+      return QCA_WCN6750;
+    }
+	return QCA_INVALID;
+}
 int btfm_slim_write(struct btfmslim *btfmslim,
 		uint16_t reg, uint8_t reg_val, uint8_t pgd)
 {
@@ -240,7 +257,10 @@ int btfm_slim_disable_ch(struct btfmslim *btfmslim, struct btfmslim_ch *ch,
 
 	chipset_ver = btpower_get_chipset_version();
 #endif
-	if (btfm_num_ports_open == 0 && (chipset_ver == QCA_HSP_SOC_ID_0200 ||
+	if (btfm_num_ports_open == 0 && ( btfmslim->soc_id == QCA_QCA6490 ||
+		btfmslim->soc_id == QCA_WCN3990 ||
+		btfmslim->soc_id == QCA_WCN7850 ||
+		chipset_ver == QCA_HSP_SOC_ID_0200 ||
 		chipset_ver == QCA_HSP_SOC_ID_0210 ||
 		chipset_ver == QCA_HSP_SOC_ID_1201 ||
 		chipset_ver == QCA_HSP_SOC_ID_1211 ||
@@ -341,7 +361,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 	BTFMSLIM_INFO("chipset soc version:%x", chipset_ver);
 #endif
 
-	if (chipset_ver == QCA_HSP_SOC_ID_0100 ||
+	if (btfmslim->soc_id == QCA_QCA6490 ||
+		chipset_ver == QCA_HSP_SOC_ID_0100 ||
 		chipset_ver == QCA_HSP_SOC_ID_0110 ||
 		chipset_ver == QCA_HSP_SOC_ID_0200 ||
 		chipset_ver == QCA_HSP_SOC_ID_0210 ||
@@ -365,7 +386,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.dev_index = 0x0;
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
-	} else if (chipset_ver == QCA_MOSELLE_SOC_ID_0100 ||
+	} else if (btfmslim->soc_id == QCA_WCN6750 ||
+		chipset_ver == QCA_MOSELLE_SOC_ID_0100 ||
 		chipset_ver == QCA_MOSELLE_SOC_ID_0110 ||
 		chipset_ver == QCA_MOSELLE_SOC_ID_0120) {
 		BTFMSLIM_INFO("chipset is Moselle, overwriting EA");
@@ -386,7 +408,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.dev_index = 0x0;
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
-	} else if (chipset_ver == QCA_HAMILTON_SOC_ID_0100 ||
+	} else if (btfmslim->soc_id == QCA_WCN7850 ||
+		chipset_ver == QCA_HAMILTON_SOC_ID_0100 ||
 		chipset_ver ==  QCA_HAMILTON_SOC_ID_0101 ||
 		chipset_ver ==  QCA_HAMILTON_SOC_ID_0200) {
 		BTFMSLIM_INFO("chipset is Hamliton, overwriting EA");
@@ -407,7 +430,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.dev_index = 0x0;
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
-	} else if (chipset_ver == QCA_CHEROKEE_SOC_ID_0200 ||
+	} else if (btfmslim->soc_id == QCA_WCN3990 ||
+		chipset_ver == QCA_CHEROKEE_SOC_ID_0200 ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0201  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0210  ||
 		chipset_ver ==  QCA_CHEROKEE_SOC_ID_0211  ||
@@ -444,7 +468,8 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 		slim_ifd->e_addr.dev_index = 0x0;
 		slim_ifd->e_addr.instance = 0x0;
 		slim_ifd->laddr = 0x0;
-	}  else if (chipset_ver == QCA_HASTINGS_SOC_ID_0200 ) {
+	}  else if (btfmslim->soc_id == QCA_QCA6390 ||
+                chipset_ver == QCA_HASTINGS_SOC_ID_0200 ) {
                 BTFMSLIM_INFO("chipset is Hastings, overwriting EA");
                 slim->is_laddr_valid = false;
                 slim->e_addr.manf_id = SLIM_MANF_ID_QCOM;
@@ -562,6 +587,7 @@ static int btfm_slim_probe(struct slim_device *slim)
 {
 	int ret = 0;
 	struct btfmslim *btfm_slim;
+	const char *soc_name;
 
 	pr_info("%s: name = %s\n", __func__, dev_name(&slim->dev));
 	/*this as true during the probe then slimbus won't check for logical address*/
@@ -573,6 +599,10 @@ static int btfm_slim_probe(struct slim_device *slim)
 	BTFMSLIM_ERR("is_laddr_valid is true");
 	if (!slim->ctrl)
 		return -EINVAL;
+
+	ret = of_property_read_string(slim->dev.of_node,
+				      "btfm_socname",
+				      &soc_name);
 
 	/* Allocation btfmslim data pointer */
 	btfm_slim = kzalloc(sizeof(struct btfmslim), GFP_KERNEL);
@@ -587,6 +617,7 @@ static int btfm_slim_probe(struct slim_device *slim)
 	btfm_slim->tx_chs = SLIM_SLAVE_TXPORT;
 	btfm_slim->vendor_init = SLIM_SLAVE_INIT;
 	btfm_slim->vendor_port_en = SLIM_SLAVE_PORT_EN;
+	btfm_slim->soc_id = btfm_slim_socid(soc_name);
 
 	/* Created Mutex for slimbus data transfer */
 	mutex_init(&btfm_slim->io_lock);
