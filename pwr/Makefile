@@ -3,8 +3,8 @@
 KBUILD_OPTIONS+= BT_ROOT=$(KERNEL_SRC)/$(M)/../
 
 ccflags-y += -I$(BT_ROOT)/include
-ccflags-y += -I$(WORKSPACE)/wlan/platform/inc
-ccflags-y += -I$(WORKSPACE)/wlan/platform/cnss_utils
+# ccflags-y += -I$(WORKSPACE)/wlan/platform/inc
+# ccflags-y += -I$(WORKSPACE)/wlan/platform/cnss_utils
 obj-$(CONFIG_MSM_BT_POWER)  += btpower.o
 
 all: modules
