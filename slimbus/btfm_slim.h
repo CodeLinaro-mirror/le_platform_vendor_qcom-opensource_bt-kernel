@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef BTFM_SLIM_H
@@ -73,6 +73,7 @@ struct btfmslim {
 	int soc_id;
 	struct btfmslim_ch *rx_chs;
 	struct btfmslim_ch *tx_chs;
+	struct snd_pcm_chmap *chmap_info;
 	int (*vendor_init)(struct btfmslim *btfmslim);
 	int (*vendor_port_en)(struct btfmslim *btfmslim, uint8_t port_num,
 		uint8_t rxport, uint8_t enable);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -15,12 +15,17 @@
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <sound/control.h>
+#include <sound/core.h>
+#include <sound/tlv.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
 #include "btfm_slim.h"
+
+#define MAX_PORT 20
 
 static int bt_soc_enable_status;
 int btfm_feedback_ch_setting;
@@ -377,6 +382,80 @@ static int btfm_slim_dai_get_channel_map(struct snd_soc_dai *dai,
 	return 0;
 }
 
+static int btfm_slim_chmap_ctl_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dai *dai = info->private_data;
+	uint32_t *chmap_data = NULL, *chmap = NULL;
+	uint32_t rx_ch_cnt = 0;
+	uint32_t tx_ch_cnt = 0;
+	uint32_t rx_ch[MAX_PORT], tx_ch[MAX_PORT], ch_cnt;
+	int i = 0, len = 0, ret = 0;
+
+	ret = snd_soc_dai_get_channel_map(dai, &tx_ch_cnt, tx_ch, &rx_ch_cnt, rx_ch);
+	if (ret || (tx_ch_cnt == 0 && rx_ch_cnt == 0)) {
+		BTFMSLIM_ERR("%s: got incorrect channel map\n", __func__);
+		return ret;
+	}
+
+	if (rx_ch_cnt) {
+		chmap = rx_ch;
+		ch_cnt = rx_ch_cnt;
+	} else {
+		chmap = tx_ch;
+		ch_cnt = tx_ch_cnt;
+	}
+	if (ch_cnt > 2) {
+		BTFMSLIM_ERR("%s: Incorrect channel count: %d\n", __func__, ch_cnt);
+		return -EINVAL;
+	}
+
+	len = sizeof(uint32_t) * (ch_cnt + 1);
+	chmap_data = kzalloc(len, GFP_KERNEL);
+	if (!chmap_data)
+		return -ENOMEM;
+
+	chmap_data[0] = ch_cnt;
+	for (i = 0; i < ch_cnt; i++)
+		chmap_data[i+1] = chmap[i];
+
+	memcpy(ucontrol->value.bytes.data, chmap_data, len);
+
+	kfree(chmap_data);
+	return 0;
+}
+
+static int btfm_slim_add_chmap_ctls(struct snd_soc_pcm_runtime *rtd,
+					struct snd_soc_dai *dai, int dir)
+{
+	int ret = 0;
+	struct snd_soc_dai_driver *drv = dai->driver;
+	struct btfmslim *btfm_slim = snd_soc_dai_get_drvdata(dai);
+
+	ret =  snd_pcm_add_chmap_ctls(rtd->pcm, dir, NULL,
+			2 * sizeof(uint32_t), 0, &btfm_slim->chmap_info);
+	if (ret < 0)
+		return ret;
+
+	/* override handlers */
+	btfm_slim->chmap_info->private_data = dai;
+	btfm_slim->chmap_info->kctl->get = btfm_slim_chmap_ctl_get;
+
+	return 0;
+}
+
+static int btfm_slim_pcm_new(struct snd_soc_pcm_runtime *rtd,
+					struct snd_soc_dai *dai)
+{
+	int dir = SNDRV_PCM_STREAM_PLAYBACK;
+
+	if (dai->id == BTFM_BT_SCO_SLIM_TX || dai->id == BTFM_BT_SPLIT_A2DP_SLIM_TX)
+		dir = SNDRV_PCM_STREAM_CAPTURE;
+
+	return btfm_slim_add_chmap_ctls(rtd, dai, dir);
+}
+
 static struct snd_soc_dai_ops btfmslim_dai_ops = {
 	.startup = btfm_slim_dai_startup,
 	.shutdown = btfm_slim_dai_shutdown,
@@ -384,6 +463,7 @@ static struct snd_soc_dai_ops btfmslim_dai_ops = {
 	.prepare = btfm_slim_dai_prepare,
 	.set_channel_map = btfm_slim_dai_set_channel_map,
 	.get_channel_map = btfm_slim_dai_get_channel_map,
+	.pcm_new = btfm_slim_pcm_new,
 };
 
 static struct snd_soc_dai_driver btfmslim_dai[] = {
