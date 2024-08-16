@@ -50,6 +50,8 @@ int btfm_slim_socid(char *soc_name)
       return QCA_WCN3990;
     } else if (strstr(soc_name, "wcn6750")) {
       return QCA_WCN6750;
+    } else if (strstr(soc_name, "wcn6855")) {
+      return QCA_WCN6855;
     }
 	return QCA_INVALID;
 }
@@ -370,6 +372,7 @@ int btfm_slim_hw_init(struct btfmslim *btfmslim)
 #endif
 
 	if (btfmslim->soc_id == QCA_QCA6490 ||
+		btfmslim->soc_id == QCA_WCN6855 ||
 		chipset_ver == QCA_HSP_SOC_ID_0100 ||
 		chipset_ver == QCA_HSP_SOC_ID_0110 ||
 		chipset_ver == QCA_HSP_SOC_ID_0200 ||
