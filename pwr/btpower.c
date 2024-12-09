@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/version.h>
 #include <linux/uaccess.h>
 #include <linux/of_device.h>
 #include <soc/qcom/cmd-db.h>
@@ -1445,7 +1446,11 @@ static int __init btpower_init(void)
 		goto chrdev_err;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
 	bt_class = class_create(THIS_MODULE, "bt-dev");
+#else
+	bt_class = class_create("bt-dev");
+#endif
 	if (IS_ERR(bt_class)) {
 		pr_err("%s: coudn't create class\n", __func__);
 		ret = -1;
