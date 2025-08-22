@@ -25,6 +25,7 @@
 #include <linux/version.h>
 #include <linux/uaccess.h>
 #include <linux/of_device.h>
+#include <linux/miscdevice.h>
 #include <soc/qcom/cmd-db.h>
 #include "btpower.h"
 #if (defined CONFIG_BT_SLIM)
@@ -243,8 +244,6 @@ static int bt_power_src_status[BT_POWER_SRC_SIZE];
 static struct btpower_platform_data *bt_power_pdata;
 static bool previous;
 static int pwr_state;
-static struct class *bt_class;
-static int bt_major;
 static int soc_id;
 static bool probe_finished;
 
@@ -1423,8 +1422,15 @@ static struct platform_driver bt_power_driver = {
 };
 
 static const struct file_operations bt_dev_fops = {
+	.owner = THIS_MODULE,
 	.unlocked_ioctl = bt_ioctl,
 	.compat_ioctl = bt_ioctl,
+};
+
+static struct miscdevice btpower_miscdev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "btpower",
+	.fops = &bt_dev_fops,
 };
 
 static int __init btpower_init(void)
@@ -1435,44 +1441,18 @@ static int __init btpower_init(void)
 	ret = platform_driver_register(&bt_power_driver);
 	if (ret) {
 		pr_err("%s: platform_driver_register error: %d\n",
-			__func__, ret);
-		goto driver_err;
+		       __func__, ret);
+		return ret;
 	}
 
-	bt_major = register_chrdev(0, "bt", &bt_dev_fops);
-	if (bt_major < 0) {
-		pr_err("%s: failed to allocate char dev\n", __func__);
-		ret = -1;
-		goto chrdev_err;
-	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
-	bt_class = class_create(THIS_MODULE, "bt-dev");
-#else
-	bt_class = class_create("bt-dev");
-#endif
-	if (IS_ERR(bt_class)) {
-		pr_err("%s: coudn't create class\n", __func__);
-		ret = -1;
-		goto class_err;
-	}
-
-
-	if (device_create(bt_class, NULL, MKDEV(bt_major, 0),
-		NULL, "btpower") == NULL) {
-		pr_err("%s: failed to allocate char dev\n", __func__);
-		goto device_err;
+	ret = misc_register(&btpower_miscdev);
+	if (ret) {
+		pr_err("%s: misc_register error: %d\n",
+		       __func__, ret);
+		platform_driver_unregister(&bt_power_driver);
+		return ret;
 	}
 	return 0;
-
-device_err:
-	class_destroy(bt_class);
-class_err:
-	unregister_chrdev(bt_major, "bt");
-chrdev_err:
-	platform_driver_unregister(&bt_power_driver);
-driver_err:
-	return ret;
 }
 
 /**
@@ -1612,11 +1592,7 @@ static int btpower_enable_ipa_vreg(struct btpower_platform_data *pdata)
 
 static void __exit btpower_exit(void)
 {
-	device_destroy(bt_class, MKDEV(bt_major, 0));
-	if (!IS_ERR(bt_class))
-		class_destroy(bt_class);
-	if (bt_major >= 0)
-		unregister_chrdev(bt_major, "bt");
+	misc_deregister(&btpower_miscdev);
 	platform_driver_unregister(&bt_power_driver);
 }
 
