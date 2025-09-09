@@ -1,0 +1,5 @@
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
+
+load(":target.bzl", "define_sdxkova")
+
+define_sdxkova()
