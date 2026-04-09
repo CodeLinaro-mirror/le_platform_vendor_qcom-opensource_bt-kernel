@@ -221,6 +221,29 @@ static struct vreg_data bt_vregs_info_kiwi[] = {
 		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
 };
 
+// Regulator structure for cologne BT SoC series
+static struct vreg_data bt_vregs_info_cologne[] = {
+	{NULL, "qcom,bt-vdd18-aon",      1800000, 1800000, 0, false, true,
+		{BT_VDD_LDO, BT_VDD_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd12-io",      1200000, 1200000, 0, false, true,
+		{BT_VDD_IO_LDO, BT_VDD_IO_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-aon",     950000,  950000,  0, false, true,
+		 {BT_VDD_AON_LDO, BT_VDD_AON_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  950000,  0, false, true,
+		{BT_VDD_RFACMN, BT_VDD_RFACMN_CURRENT}},
+	/* BT_CX_MX */
+	{NULL, "qcom,bt-vdd-dig",      950000,  950000,  0, false, true,
+		{BT_VDD_DIG_LDO, BT_VDD_DIG_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfaOp8",  950000,  952000,  0, false, true,
+		{BT_VDD_RFA_0p8, BT_VDD_RFA_0p8_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa1",     1350000, 1350000, 0, false, true,
+		{BT_VDD_RFA1_LDO, BT_VDD_RFA1_LDO_CURRENT}},
+	{NULL, "qcom,bt-vdd-rfa2",     1900000, 1900000, 0, false, true,
+		{BT_VDD_RFA2_LDO, BT_VDD_RFA2_LDO_CURRENT}},
+	{NULL, "qcom,bt-ant-ldo",  1776000, 1776000, 0, false, true,
+		{BT_VDD_ANT_LDO, BT_VDD_ANT_LDO_CURRENT}},
+};
+
 static struct vreg_data platform_vregs_info_peach[] = {
 	/* VDD1P8_AON */
 	{NULL, "qcom,bt-vdd18-aon",      1620000, 1980000, 0, false, true,
@@ -292,6 +315,12 @@ static struct pwr_data vreg_info_kiwi = {
 	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_kiwi),
 };
 
+static struct pwr_data vreg_info_cologne = {
+	.compatible = "qcom,wcn7760-bt",
+	.bt_vregs = bt_vregs_info_cologne,
+	.bt_num_vregs = ARRAY_SIZE(bt_vregs_info_cologne),
+};
+
 static struct pwr_data vreg_info_kiwi_no_share_ant_power = {
 	.compatible = "qcom,kiwi-no-share-ant-power",
 	.bt_vregs = bt_vregs_info_kiwi,
@@ -344,6 +373,7 @@ static const struct of_device_id bt_power_match_table[] = {
 	{	.compatible = "qcom,peach-bt", .data = &vreg_info_peach},
 	{	.compatible = "qcom,wcn786x", .data = &vreg_info_wcn786x},
 	{	.compatible = "qcom,wcn7750-bt", .data = &bt_vreg_info_wcn7750},
+	{	.compatible = "qcom,wcn7760-bt", .data = &vreg_info_cologne},
 	{},
 };
 
@@ -2228,7 +2258,7 @@ int btpower_retenion(enum plt_pwr_state client)
 		pr_err("%s: invalid retention_mode request", __func__);
 		return -1;
 	}
-	
+
 	ret = power_regulators((client == POWER_ON_BT_RETENION ? BT_CORE : UWB_CORE),
 				POWER_RETENTION);
 	if (ret < 0)
@@ -2276,7 +2306,7 @@ int btpower_on(enum plt_pwr_state client)
 		ret = platform_regulators_pwr(POWER_DISABLE_RETENTION);
 		if (ret < 0)
 			return ret;
-		if (retention_mode_state == BT_IN_RETENTION) 
+		if (retention_mode_state == BT_IN_RETENTION)
 			btpower_set_retenion_mode_state(BT_OUT_OF_RETENTION);
 		else
 			btpower_set_retenion_mode_state(UWB_OUT_OF_RETENTION);
@@ -2346,11 +2376,11 @@ int btpower_access_ctrl(enum plt_pwr_state request)
 			}
 			btpower_set_grant_pending_state(NO_OTHER_CLIENT_WAITING_FOR_GRANT);
 			return ACCESS_RELEASED;
-			
+
 		} else {
 			btpower_set_grant_state(NO_GRANT_FOR_ANY_SS);
 			btpower_set_grant_pending_state(NO_OTHER_CLIENT_WAITING_FOR_GRANT);
-			return ACCESS_RELEASED; 
+			return ACCESS_RELEASED;
 		}
 	} else if (request == UWB_RELEASE_ACCESS && grant_state == UWB_HAS_GRANT) {
 		if (grant_pending == BT_WAITING_FOR_GRANT) {
@@ -2508,7 +2538,7 @@ int btpower_process_access_req(unsigned int cmd, int req)
 		ret = schedule_client_voting(UWB_ACCESS_REQ);
 	else if (cmd == UWB_CMD_ACCESS_CTRL && req == 2)
 		ret = schedule_client_voting(UWB_RELEASE_ACCESS);
-	else 
+	else
 		pr_err("%s: unhandled command %04x req %02x", __func__, cmd, req);
 
 	return ret;
@@ -2867,7 +2897,7 @@ static long bt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case UWB_CMD_ACCESS_CTRL: {
 		ret = btpower_process_access_req(cmd, (int)arg);
 		break;
-	}	  
+	}
 	case BT_CMD_CHIPSET_VERS:
 		chipset_version = (int)arg;
 		pr_warn("%s: unified Current SOC Version : %x\n", __func__,
