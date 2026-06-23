@@ -1407,9 +1407,11 @@ static int dt_parse_vreg_info(struct device *dev, struct device_node *child,
 			vreg->max_vol = be32_to_cpup(&prop[1]);
 			vreg->load_curr = be32_to_cpup(&prop[2]);
 			vreg->is_retention_supp = be32_to_cpup(&prop[3]);
+#ifdef CONFIG_FMD_ENABLE
 			vreg->fmd_mode_set = be32_to_cpup(&prop[4]);
-			pr_err("%s: FMD mode %d for regulator %s\n", __func__,
+			pr_info("%s: FMD mode %d for regulator %s\n", __func__,
 							vreg->fmd_mode_set, vreg->name);
+#endif
 		} else if (len != (4 * sizeof(__be32))) {
 			pr_err("%s: Property %s %s, use default\n",
 				__func__, prop_name,
@@ -1421,7 +1423,7 @@ static int dt_parse_vreg_info(struct device *dev, struct device_node *child,
 			vreg->is_retention_supp = be32_to_cpup(&prop[3]);
 		}
 
-		pr_err("%s: Got regulator: %s, min_vol: %u, max_vol: %u, load_curr: %u,is_retention_supp: %u\n",
+		pr_info("%s: Got regulator: %s, min_vol: %u, max_vol: %u, load_curr: %u,is_retention_supp: %u\n",
 			__func__, vreg->name, vreg->min_vol, vreg->max_vol,
 			vreg->load_curr, vreg->is_retention_supp);
 	} else {
@@ -1771,6 +1773,7 @@ static int bt_power_probe(struct platform_device *pdev)
 	pwr_data->reftask_bt = NULL;
 	pwr_data->reftask_uwb = NULL;
 
+#ifdef CONFIG_FMD_ENABLE
 	struct device *devi = &pwr_data->pdev->dev;
 	int rc = 0;
 	pr_info("%s: Get FMD nvmem-cells\n", __func__);
@@ -1811,6 +1814,7 @@ static int bt_power_probe(struct platform_device *pdev)
 		}
 	}
 	pr_info("%s: FMD nvmem-cells read completed\n", __func__);
+#endif
 
 	pwr_data->is_ganges_dt = of_property_read_bool(pdev->dev.of_node,
 							"qcom,peach-bt") ||
